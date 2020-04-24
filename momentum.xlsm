@@ -1,0 +1,60 @@
+Option Explicit
+'we create a type momentum to store the value and the index of the stock at the same time to simplify the sorting process
+Type Momentum
+    value As Double
+    index As Integer
+End Type
+    
+
+Sub momentum_creation(rollingw As Integer, univers As Integer, freq As Integer)
+    Dim data As Variant
+    Dim univpercent As Integer
+    univpercent = univers * 28 * 0.01 'we need to transform the percentage into a number of stocks
+    data = ThisWorkbook.Worksheets("Stocks").Range("C10:AD1627") 'we gather the data
+    Dim momentum_tab(1 To 28) As Momentum 'our set of stock's values
+    Dim i As Integer
+    Dim jour As Integer
+    Dim l As Integer
+    Dim j As Integer
+    Dim vl As Double 'the liquidative value of the portfolio
+    Dim rf(1 To 1617) As Double 'the momentum factor used for the second part
+    Dim tmp As Double
+    Dim temp As Momentum
+    vl = 0 'liquidative value is set to 0 at the beginning
+    For i = 1 To 1617
+        rf(i) = 0 'while the momentum factor won't be calculated at the beginning of time because of the rolling window we set it to 0
+    Next
+    For jour = 1 + freq To 1617 - rollingw Step freq 'this first loop change the rebalancing frequency
+        For i = 1 To 28
+            momentum_tab(i).index = i
+            momentum_tab(i).value = data(jour, i) - data(jour - rollingw, i) 'we're setting up our return value
+        Next
+        For l = 1 To 28
+            For j = 1 To 27
+                If momentum_tab(j).value > momentum_tab(j + 1).value Then
+                    temp = momentum_tab(j + 1)
+                    momentum_tab(j + 1) = momentum_tab(j)
+                    momentum_tab(j) = temp
+                End If 'this part is for sorting return value
+            Next
+        Next
+        For j = jour To jour + rollingw
+            For i = 1 To univpercent
+                rf(j) = vl
+                vl = vl - 100 * (data(j, momentum_tab(i).index) / data(j - 1, momentum_tab(i).index)) + 100 * (data(j, momentum_tab(29 - i).index) / data(j - 1, momentum_tab(29 - i).index))
+                If vl = 0 Then
+                    rf(j) = 0
+                Else
+                    rf(j) = -(rf(j) - vl) / vl
+                End If 'we compute the liquidative value and the momentum factor
+            Next
+        Next
+    Next
+    For i = 1 To 1617
+        Sheets("Feuil1").Cells(15, 1 + i).value = rf(i) 'we display the momentum factor in the worksheet to use it later
+    Next
+End Sub
+
+Sub main()
+    Call momentum_creation(20, 10, 20)
+End Sub
